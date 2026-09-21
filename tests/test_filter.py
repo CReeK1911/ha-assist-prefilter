@@ -229,6 +229,100 @@ def test_lampan_i_barnrummet_is_the_ceiling_light() -> None:
     assert {a.area_id for a in result.areas} == {"barnrummet"}
 
 
+def test_slack_lampan_prefers_the_light_that_is_on() -> None:
+    cat = _house_catalog()
+    ceiling = "light.taklampa_barnrum_sovrum_barn"
+    window = "light.fonster_belysning_barnrum_sovrum_barn"
+    cat.entities = [
+        (
+            CatalogEntity(
+                entity_id=entity.entity_id,
+                name=entity.name,
+                domain=entity.domain,
+                aliases=entity.aliases,
+                area_id=entity.area_id,
+                area_name=entity.area_name,
+                area_aliases=entity.area_aliases,
+                state="off" if entity.entity_id == ceiling else "on",
+            )
+            if entity.entity_id in {ceiling, window}
+            else entity
+        )
+        for entity in cat.entities
+    ]
+    result = filter_catalog("Släck lampan i barnrummet", cat)
+    assert [entity.entity_id for entity in result.entities] == [window]
+
+
+def test_tand_lampan_prefers_the_light_that_is_off() -> None:
+    cat = _house_catalog()
+    ceiling = "light.taklampa_barnrum_sovrum_barn"
+    window = "light.fonster_belysning_barnrum_sovrum_barn"
+    cat.entities = [
+        CatalogEntity(
+            entity_id=entity.entity_id,
+            name=entity.name,
+            domain=entity.domain,
+            aliases=entity.aliases,
+            area_id=entity.area_id,
+            area_name=entity.area_name,
+            area_aliases=entity.area_aliases,
+            state=(
+                "on"
+                if entity.entity_id == ceiling
+                else "off"
+                if entity.entity_id == window
+                else entity.state
+            ),
+        )
+        for entity in cat.entities
+    ]
+    result = filter_catalog("Tänd lampan i barnrummet", cat)
+    assert [entity.entity_id for entity in result.entities] == [window]
+
+
+def test_slack_lamporna_keeps_every_light_that_is_on() -> None:
+    cat = _house_catalog()
+    ceiling = "light.taklampa_barnrum_sovrum_barn"
+    window = "light.fonster_belysning_barnrum_sovrum_barn"
+    cat.entities = [
+        CatalogEntity(
+            entity_id=entity.entity_id,
+            name=entity.name,
+            domain=entity.domain,
+            aliases=entity.aliases,
+            area_id=entity.area_id,
+            area_name=entity.area_name,
+            area_aliases=entity.area_aliases,
+            state="on" if entity.entity_id in {ceiling, window} else entity.state,
+        )
+        for entity in cat.entities
+    ]
+    result = filter_catalog("Släck lamporna i barnrummet", cat)
+    assert {entity.entity_id for entity in result.entities} == {ceiling, window}
+
+
+def test_slack_when_nothing_is_on_still_returns_the_ceiling() -> None:
+    cat = _house_catalog()
+    ceiling = "light.taklampa_barnrum_sovrum_barn"
+    window = "light.fonster_belysning_barnrum_sovrum_barn"
+    cat.entities = [
+        CatalogEntity(
+            entity_id=entity.entity_id,
+            name=entity.name,
+            domain=entity.domain,
+            aliases=entity.aliases,
+            area_id=entity.area_id,
+            area_name=entity.area_name,
+            area_aliases=entity.area_aliases,
+            state="off" if entity.entity_id in {ceiling, window} else entity.state,
+        )
+        for entity in cat.entities
+    ]
+    result = filter_catalog("Släck lampan i barnrummet", cat)
+    assert [entity.entity_id for entity in result.entities] == [ceiling]
+
+
 def test_fonsterlampa_i_barnrummet_stays_the_window() -> None:
     result = filter_catalog("Släck fönsterlampan i barnrummet", _house_catalog())
     assert result.entities[0].entity_id == "light.fonster_belysning_barnrum_sovrum_barn"

@@ -64,6 +64,9 @@ _FIXTURE_WORDS = frozenset(
     )
 )
 _CEILING_WORDS = frozenset(fold(word) for word in ("taklampa", "takbelysning", "takljus"))
+# "släck" wants lights that are still on. "tänd" wants lights that are off.
+_TURN_OFF_WORDS = frozenset(fold(word) for word in ("släck", "släcka", "off"))
+_TURN_ON_WORDS = frozenset(fold(word) for word in ("tänd", "tända", "on"))
 _DOMAIN_CUE_WORDS = frozenset(
     word for cues in _FOLDED_DOMAIN_CUES.values() for word in cues
 )
@@ -200,6 +203,25 @@ def _is_ceiling_light(entity: CatalogEntity) -> bool:
     return bool(_name_tokens(entity) & _CEILING_WORDS)
 
 
+def _actionable_state(text: str) -> str | None:
+    """State a light should have now for this command to still do something.
+
+    "släck" → "on". "tänd" → "off". None when the sentence is not that command.
+    """
+    raw = set(folded_tokens(text))
+    turn_off = bool(raw & _TURN_OFF_WORDS)
+    turn_on = bool(raw & _TURN_ON_WORDS)
+    if turn_off and not turn_on:
+        return "on"
+    if turn_on and not turn_off:
+        return "off"
+    return None
+
+
+def _in_state(entity: CatalogEntity, state: str) -> bool:
+    return (entity.state or "").casefold() == state
+
+
 def _primary_entities(
     catalog: Catalog,
     area_ids: set[str],
@@ -323,7 +345,23 @@ def filter_catalog(
         }
         if matched:
             selected_ids = matched
-    elif _generic_singular_lamp(text):
+
+    # "släck" keeps lights that are on. "tänd" keeps lights that are off.
+    # If every candidate is already in the other state, keep them so the
+    # model can say so instead of being handed an empty list.
+    actionable = _actionable_state(text)
+    state_narrowed = False
+    if actionable and "light" in cue_domains:
+        matching = {
+            eid
+            for eid in selected_ids
+            if _in_state(entity_by_id[eid], actionable)
+        }
+        if matching:
+            selected_ids = matching
+            state_narrowed = True
+
+    if not state_narrowed and not fixture_words and _generic_singular_lamp(text):
         # "lampan" with no fixture is the ceiling light when the room has one.
         # Otherwise the window light sorts first and the assistant picks that.
         ceilings = {
