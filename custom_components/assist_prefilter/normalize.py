@@ -15,6 +15,7 @@ SV_DEFINITE: dict[str, tuple[str, ...]] = {
     "kök": ("kök", "köket"),
     "hall": ("hall", "hallen"),
     "sovrum": ("sovrum", "sovrummet"),
+    "barnrum": ("barnrum", "barnrummet"),
     "badrum": ("badrum", "badrummet"),
     "vardagsrum": ("vardagsrum", "vardagsrummet"),
     "toalett": ("toalett", "toaletten"),

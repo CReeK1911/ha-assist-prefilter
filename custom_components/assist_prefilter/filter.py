@@ -30,6 +30,40 @@ _FOLDED_DOMAIN_CUES: dict[str, frozenset[str]] = {
 }
 _FOLDED_QUERY_CUES = frozenset(fold(w) for w in QUERY_CUES)
 _FOLDED_STOPWORDS = frozenset(fold(w) for w in ACTION_STOPWORDS)
+# "släck lampan i barnrummet" means the main ceiling light, not the window light.
+_SINGULAR_LAMP_WORDS = frozenset(
+    fold(word)
+    for word in ("lampa", "lampan", "ljus", "ljuset", "light", "lamp")
+)
+_FIXTURE_WORDS = frozenset(
+    fold(word)
+    for word in (
+        "tak",
+        "taklampa",
+        "takbelysning",
+        "takljus",
+        "fönster",
+        "fonster",
+        "fönsterlampa",
+        "bänk",
+        "bank",
+        "bänklampa",
+        "säng",
+        "sang",
+        "hörn",
+        "horn",
+        "julgran",
+        "matplats",
+        "spegel",
+        "dusch",
+        "advent",
+        "underskåp",
+        "underskap",
+        "klot",
+        "slinga",
+    )
+)
+_CEILING_WORDS = frozenset(fold(word) for word in ("taklampa", "takbelysning", "takljus"))
 _DOMAIN_CUE_WORDS = frozenset(
     word for cues in _FOLDED_DOMAIN_CUES.values() for word in cues
 )
@@ -144,6 +178,28 @@ def _score_entity(
     return score, specific or bool(name_overlap - _DOMAIN_CUE_WORDS)
 
 
+def _fixture_words_in(text: str) -> set[str]:
+    found: set[str] = set()
+    for token in folded_tokens(text):
+        found |= expand_token(token) & _FIXTURE_WORDS
+    return found
+
+
+def _generic_singular_lamp(text: str) -> bool:
+    """True for "lampan"/"ljuset" without a fixture word like tak or fönster."""
+    raw = set(folded_tokens(text))
+    if not raw & _SINGULAR_LAMP_WORDS:
+        return False
+    for token in raw:
+        if expand_token(token) & _FIXTURE_WORDS:
+            return False
+    return True
+
+
+def _is_ceiling_light(entity: CatalogEntity) -> bool:
+    return bool(_name_tokens(entity) & _CEILING_WORDS)
+
+
 def _primary_entities(
     catalog: Catalog,
     area_ids: set[str],
@@ -245,6 +301,36 @@ def filter_catalog(
         for ent in _primary_entities(catalog, {satellite_area_id}, cue_domains):
             selected_ids.add(ent.entity_id)
             entity_scores.setdefault(ent.entity_id, 1)
+
+    # "lampan" is a light. Do not also hand the model switches in that room.
+    if "light" in cue_domains:
+        lights = {
+            eid
+            for eid in selected_ids
+            if entity_by_id[eid].domain == "light"
+        }
+        if lights:
+            selected_ids = lights
+
+    # "fönsterlampan" must not lose to the ceiling light just because both
+    # contain "lampa". Keep entities that match the named fixture.
+    fixture_words = _fixture_words_in(text)
+    if fixture_words:
+        matched = {
+            eid
+            for eid in selected_ids
+            if _name_tokens(entity_by_id[eid]) & fixture_words
+        }
+        if matched:
+            selected_ids = matched
+    elif _generic_singular_lamp(text):
+        # "lampan" with no fixture is the ceiling light when the room has one.
+        # Otherwise the window light sorts first and the assistant picks that.
+        ceilings = {
+            eid for eid in selected_ids if _is_ceiling_light(entity_by_id[eid])
+        }
+        if ceilings:
+            selected_ids = ceilings
 
     ranked_entities = sorted(
         (entity_by_id[eid] for eid in selected_ids if eid in entity_by_id),

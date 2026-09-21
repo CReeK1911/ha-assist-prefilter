@@ -76,8 +76,7 @@ def test_satellite_kitchen_boosts_kitchen_lights() -> None:
         satellite_area_id="kok",
     )
     ids = [e.entity_id for e in result.entities]
-    assert "light.kok_taklampa" in ids
-    assert "light.kok_bank" in ids
+    assert ids == ["light.kok_taklampa"]
     assert "light.vardagsrum_tv" not in ids
     assert "media_player.vardagsrum_tv" not in ids
 
@@ -161,6 +160,20 @@ def _house_catalog() -> Catalog:
                 area_name="Barnrummet",
             ),
             CatalogEntity(
+                entity_id="light.fonster_belysning_barnrum_sovrum_barn",
+                name="Fönster belysning barnrum - Sovrum barn",
+                domain="light",
+                area_id="barnrummet",
+                area_name="Barnrummet",
+            ),
+            CatalogEntity(
+                entity_id="switch.sonoff_barnrum_adventsljusstake_switch",
+                name="SONOFF Barnrum adventsljusstake Switch",
+                domain="switch",
+                area_id="barnrummet",
+                area_name="Barnrummet",
+            ),
+            CatalogEntity(
                 entity_id="script.filmbelysning_kok",
                 name="Filmbelysning kök",
                 domain="script",
@@ -206,6 +219,19 @@ def test_fonsterlampa_in_kitchen_not_living_room() -> None:
     ids = [e.entity_id for e in result.entities]
     assert ids[0] == "light.kok_fonsterlampa_kok"
     assert "light.taklampa_barnrum_sovrum_barn" not in ids
+
+
+def test_lampan_i_barnrummet_is_the_ceiling_light() -> None:
+    result = filter_catalog("Släck lampan i barnrummet", _house_catalog())
+    assert [e.entity_id for e in result.entities] == [
+        "light.taklampa_barnrum_sovrum_barn"
+    ]
+    assert {a.area_id for a in result.areas} == {"barnrummet"}
+
+
+def test_fonsterlampa_i_barnrummet_stays_the_window() -> None:
+    result = filter_catalog("Släck fönsterlampan i barnrummet", _house_catalog())
+    assert result.entities[0].entity_id == "light.fonster_belysning_barnrum_sovrum_barn"
 
 
 def test_fonster_in_area_name_does_not_steal_kitchen() -> None:
