@@ -35,6 +35,7 @@ from .const import (
     error_speech,
 )
 from .filter import FilterResult, filter_catalog, utterance_is_query
+from .filter_store import clear_pending, store_pending
 from .normalize import expand_tokens, folded_tokens
 
 _LOGGER = logging.getLogger(__name__)
@@ -261,6 +262,8 @@ class AssistPrefilterEntity(
             if conf.get(CONF_FALLBACK_TO_FULL_CATALOG) and not result.entities
             else None
         )
+        visible = fallback.entities if fallback is not None else result.entities
+        store_pending(self.hass, user_input.context, {e.entity_id for e in visible})
         prompt = render_from_filter(
             result,
             include_state=bool(conf.get(CONF_INCLUDE_STATE, True)),
@@ -302,3 +305,5 @@ class AssistPrefilterEntity(
         except ValueError:
             _LOGGER.debug("Downstream agent missing: %s", downstream)
             return self._error_result(user_input, chat_log, "missing_agent")
+        finally:
+            clear_pending(self.hass, user_input.context)

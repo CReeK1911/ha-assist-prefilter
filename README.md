@@ -26,6 +26,7 @@ wake → STT → Assist Prefilter
 3. Install **Assist Prefilter** and **restart Home Assistant**
 4. Settings → Devices & services → Add integration → **Assist Prefilter**
 5. Pick a **name** and the **downstream conversation agent** (Ollama / OpenAI / Gemini / …)
+6. On that downstream agent, set the Home Assistant control API to **Assist Prefilter** instead of **Assist**. Do not select both. Assist still pastes the whole house into the prompt; Assist Prefilter replaces that list with this request's matches.
 
 Manual install: copy `custom_components/assist_prefilter/` into `/config/custom_components/` and restart.
 
@@ -100,9 +101,23 @@ JSON the sidecar should understand (any of these shapes):
 
 A v2 add-on wrapping Needle is out of scope for this release.
 
-## Limitation (v1)
+## Filtered LLM API (required for speed)
 
-Official Assist LLM **tools** may still theoretically see every exposed entity. v1 mitigates that with an authoritative `extra_system_prompt` (“only use these targets”). A later version can register a custom `llm.API` that actually drops non-hit entity_ids from the tool list.
+The pipeline conversation agent only adds a short note. Home Assistant's **Assist** API still inserts a "Static Context" YAML of every exposed entity, and that is what makes a local model slow.
+
+This integration registers an LLM API named **Assist Prefilter**. It keeps Assist's control tools (`HassTurnOn` and the rest) and `GetLiveContext`, but the static list and live-context tool are limited to the entities the prefilter just matched.
+
+On each downstream conversation agent (the LLM, not the pipeline):
+
+1. Open its settings.
+2. Under control / LLM API, select **Assist Prefilter**.
+3. Remove **Assist** if it is also selected. Leaving both in sends the full house again.
+
+If you talk to that LLM agent directly, without going through the prefilter pipeline, the API falls back to the full Assist list.
+
+## Limitation
+
+Intent tools can still act on any exposed entity if the model invents a name. The prompt no longer lists those entities. A custom tool filter that rejects calls outside the hit list is not in this version. Needle is still optional and does not shrink Static Context.
 
 ## Manual checks after install
 

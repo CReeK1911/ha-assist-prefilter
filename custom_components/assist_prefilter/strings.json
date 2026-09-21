@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Assist Prefilter",
-        "description": "This is not an LLM. It sits in the Assist pipeline, shrinks the house to the spoken area/entities, and forwards the original sentence to your existing conversation agent.",
+        "description": "This is not an LLM. It sits in the Assist pipeline and forwards the original sentence to your existing conversation agent. On that agent, set the control API to Assist Prefilter instead of Assist, or the full house is still sent.",
         "data": {
           "name": "Name",
           "downstream_agent_id": "Downstream conversation agent",

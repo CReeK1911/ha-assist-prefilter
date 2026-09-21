@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Assist Prefilter",
-        "description": "Detta är ingen LLM. Integrationen sitter i Assist-pipelinen, begränsar huset till nämnda ytor/enheter och skickar originalmeningen vidare till din befintliga konversationsagent.",
+        "description": "Detta är ingen LLM. Integrationen sitter i Assist-pipelinen och skickar originalmeningen vidare till din befintliga konversationsagent. På den agenten, välj styr-API Assist Prefilter i stället för Assist, annars skickas fortfarande hela huset.",
         "data": {
           "name": "Namn",
           "downstream_agent_id": "Nedströms konversationsagent",

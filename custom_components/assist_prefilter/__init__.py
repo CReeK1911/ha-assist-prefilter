@@ -71,6 +71,9 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     from .normalize import expand_tokens, fold, folded_tokens
 
     hass.data.setdefault(DOMAIN, {})
+    from .llm_api import async_register_filtered_api
+
+    async_register_filtered_api(hass)
     if hass.services.has_service(DOMAIN, SERVICE_DEBUG_FILTER):
         return True
 
