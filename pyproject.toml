@@ -1,0 +1,18 @@
+[project]
+name = "assist-prefilter"
+version = "0.1.0"
+description = "HACS conversation agent that prefilters Assist context for a downstream LLM"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["custom_components"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]

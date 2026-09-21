@@ -1,0 +1,73 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Assist Prefilter",
+        "description": "This is not an LLM. It sits in the Assist pipeline, shrinks the house to the spoken area/entities, and forwards the original sentence to your existing conversation agent.",
+        "data": {
+          "name": "Name",
+          "downstream_agent_id": "Downstream conversation agent",
+          "max_entities": "Max entities in context",
+          "max_areas": "Max areas in context"
+        }
+      }
+    },
+    "error": {
+      "invalid_agent": "Pick an existing conversation agent (conversation.*).",
+      "recursion": "The downstream agent cannot be this Assist Prefilter entity."
+    },
+    "abort": {
+      "already_configured": "This entry is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Assist Prefilter options",
+        "data": {
+          "name": "Name",
+          "downstream_agent_id": "Downstream conversation agent",
+          "prefer_local_intents": "Prefer local Home Assistant intents first",
+          "max_entities": "Max entities in context",
+          "max_areas": "Max areas in context",
+          "include_state": "Include entity state in the context block",
+          "fallback_to_full_catalog": "Fall back to the full catalog if nothing matches",
+          "exclude_domains": "Domains to exclude (unless the utterance looks like a query)",
+          "needle_url": "Needle sidecar URL (optional)",
+          "needle_enabled": "Enable Needle 3 refine"
+        }
+      }
+    },
+    "error": {
+      "invalid_agent": "Pick an existing conversation agent (conversation.*).",
+      "recursion": "The downstream agent cannot be this Assist Prefilter entity."
+    }
+  },
+  "services": {
+    "debug_filter": {
+      "name": "Debug filter",
+      "description": "Run the prefilter on a sentence and return tokens, matches, and the context block that would be sent to the LLM.",
+      "fields": {
+        "text": {
+          "name": "Text",
+          "description": "Utterance to filter, for example 'släck taklampan i köket'."
+        },
+        "agent_entity_id": {
+          "name": "Prefilter entity",
+          "description": "Optional conversation.assist_prefilter_* entity when several entries exist."
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "not_configured": {
+      "message": "Assist Prefilter is not configured. Pick a downstream conversation agent."
+    },
+    "missing_agent": {
+      "message": "The downstream conversation agent is unavailable."
+    },
+    "recursion": {
+      "message": "Assist Prefilter cannot use itself as the downstream agent."
+    }
+  }
+}

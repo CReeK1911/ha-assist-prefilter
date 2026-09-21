@@ -1,0 +1,73 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Assist Prefilter",
+        "description": "Detta är ingen LLM. Integrationen sitter i Assist-pipelinen, begränsar huset till nämnda ytor/enheter och skickar originalmeningen vidare till din befintliga konversationsagent.",
+        "data": {
+          "name": "Namn",
+          "downstream_agent_id": "Nedströms konversationsagent",
+          "max_entities": "Max antal enheter i kontexten",
+          "max_areas": "Max antal ytor i kontexten"
+        }
+      }
+    },
+    "error": {
+      "invalid_agent": "Välj en befintlig konversationsagent (conversation.*).",
+      "recursion": "Nedströmsagenten kan inte vara denna Assist Prefilter-entitet."
+    },
+    "abort": {
+      "already_configured": "Den här posten är redan konfigurerad."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Alternativ för Assist Prefilter",
+        "data": {
+          "name": "Namn",
+          "downstream_agent_id": "Nedströms konversationsagent",
+          "prefer_local_intents": "Föredra lokala Home Assistant-intents först",
+          "max_entities": "Max antal enheter i kontexten",
+          "max_areas": "Max antal ytor i kontexten",
+          "include_state": "Inkludera enhetens state i kontextblocket",
+          "fallback_to_full_catalog": "Använd hela katalogen om inget matchar",
+          "exclude_domains": "Domäner att utesluta (om yttrandet inte ser ut som en fråga)",
+          "needle_url": "Needle-sidecar-URL (valfritt)",
+          "needle_enabled": "Aktivera Needle 3-filtrering"
+        }
+      }
+    },
+    "error": {
+      "invalid_agent": "Välj en befintlig konversationsagent (conversation.*).",
+      "recursion": "Nedströmsagenten kan inte vara denna Assist Prefilter-entitet."
+    }
+  },
+  "services": {
+    "debug_filter": {
+      "name": "Felsök filter",
+      "description": "Kör prefiltret på en mening och returnera token, träffar och kontextblocket som skulle skickas till LLM:en.",
+      "fields": {
+        "text": {
+          "name": "Text",
+          "description": "Yttrande att filtrera, till exempel 'släck taklampan i köket'."
+        },
+        "agent_entity_id": {
+          "name": "Prefilter-entitet",
+          "description": "Valfri conversation.assist_prefilter_*-entitet om du har flera poster."
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "not_configured": {
+      "message": "Assist Prefilter är inte konfigurerad. Välj en nedströms konversationsagent."
+    },
+    "missing_agent": {
+      "message": "Nedströms konversationsagent saknas eller är otillgänglig."
+    },
+    "recursion": {
+      "message": "Assist Prefilter kan inte använda sig själv som nedströms agent."
+    }
+  }
+}

@@ -1,0 +1,12 @@
+debug_filter:
+  fields:
+    text:
+      required: true
+      example: släck taklampan i köket
+      selector:
+        text:
+    agent_entity_id:
+      required: false
+      selector:
+        entity:
+          domain: conversation
