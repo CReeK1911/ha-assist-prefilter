@@ -62,6 +62,7 @@ def _apply_selection(
         entity_scores=entity_scores,
         satellite_area_id=result.satellite_area_id,
         is_query=result.is_query,
+        action=result.action,
     )
 
 

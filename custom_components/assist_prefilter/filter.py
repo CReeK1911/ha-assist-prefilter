@@ -85,6 +85,7 @@ class FilterResult:
     entity_scores: dict[str, int] = field(default_factory=dict)
     satellite_area_id: str | None = None
     is_query: bool = False
+    action: str | None = None
 
 
 def utterance_is_query(expanded_tokens: set[str]) -> bool:
@@ -346,12 +347,34 @@ def filter_catalog(
         if matched:
             selected_ids = matched
 
+    # "Släck i barnrummet" names a room but no device. That means the lights.
+    actionable = _actionable_state(text)
+    room_ids = set(spoken_area_ids)
+    if not room_ids and satellite_area_id and not _specific_name_tokens(expanded, cue_domains):
+        room_ids.add(satellite_area_id)
+    bare_room_lights = bool(
+        actionable and room_ids and not cue_domains and not _fixture_words_in(text)
+    )
+    if bare_room_lights:
+        lights = {
+            eid
+            for eid in selected_ids
+            if entity_by_id[eid].domain == "light"
+            and entity_by_id[eid].area_id in room_ids
+        }
+        if not lights:
+            for ent in catalog.entities:
+                if ent.domain == "light" and ent.area_id in room_ids:
+                    lights.add(ent.entity_id)
+                    entity_scores.setdefault(ent.entity_id, 2)
+        if lights:
+            selected_ids = lights
+
     # "släck" keeps lights that are on. "tänd" keeps lights that are off.
     # If every candidate is already in the other state, keep them so the
     # model can say so instead of being handed an empty list.
-    actionable = _actionable_state(text)
     state_narrowed = False
-    if actionable and "light" in cue_domains:
+    if actionable and ("light" in cue_domains or bare_room_lights):
         matching = {
             eid
             for eid in selected_ids
@@ -389,6 +412,13 @@ def filter_catalog(
         area_by_id[aid] for aid in kept_area_ids if aid in area_by_id
     ][: max(1, max_areas)]
 
+    action = None
+    if ranked_entities and any(entity.domain == "light" for entity in ranked_entities):
+        if actionable == "on":
+            action = "turn_off"
+        elif actionable == "off":
+            action = "turn_on"
+
     return FilterResult(
         folded_text=fold(text),
         tokens=tokens,
@@ -399,4 +429,5 @@ def filter_catalog(
         entity_scores={e.entity_id: entity_scores.get(e.entity_id, 0) for e in ranked_entities},
         satellite_area_id=satellite_area_id,
         is_query=is_query,
+        action=action,
     )

@@ -110,11 +110,32 @@ def _format_entity_line(ent: CatalogEntity, include_state: bool) -> str:
     return " | ".join(parts)
 
 
+def _action_line(action: str | None, areas: list[CatalogArea]) -> str | None:
+    if action not in {"turn_off", "turn_on"}:
+        return None
+    room = areas[0].name if areas else "the matched room"
+    if action == "turn_off":
+        verb = "turn off"
+        already = "already off"
+        wanted = "on"
+    else:
+        verb = "turn on"
+        already = "already on"
+        wanted = "off"
+    return (
+        f"Action: {verb} the lights that are {wanted} in {room}. "
+        f"Call the {verb} tool for each listed light that is {wanted}. "
+        "Do not ask which action to take. "
+        f"If every listed light is {already}, say that."
+    )
+
+
 def render_context_block(
     areas: list[CatalogArea],
     entities: list[CatalogEntity],
     *,
     include_state: bool = True,
+    action: str | None = None,
 ) -> str:
     """Tiny authoritative block injected via extra_system_prompt."""
     if not areas and not entities:
@@ -145,6 +166,10 @@ def render_context_block(
     else:
         lines.append("- (none)")
 
+    action_line = _action_line(action, areas)
+    if action_line:
+        lines.extend(["", action_line])
+
     lines.extend(
         [
             "",
@@ -166,7 +191,10 @@ def render_from_filter(
     """Render hits, or a zero-hit / full-catalog fallback."""
     if result.entities or result.areas:
         return render_context_block(
-            result.areas, result.entities, include_state=include_state
+            result.areas,
+            result.entities,
+            include_state=include_state,
+            action=result.action,
         )
     if fallback is not None:
         return render_context_block(

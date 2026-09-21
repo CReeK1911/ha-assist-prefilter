@@ -323,6 +323,32 @@ def test_slack_when_nothing_is_on_still_returns_the_ceiling() -> None:
     assert [entity.entity_id for entity in result.entities] == [ceiling]
 
 
+def test_slack_i_barnrummet_turns_off_lights_that_are_on() -> None:
+    from assist_prefilter.catalog import render_from_filter
+
+    cat = _house_catalog()
+    ceiling = "light.taklampa_barnrum_sovrum_barn"
+    window = "light.fonster_belysning_barnrum_sovrum_barn"
+    cat.entities = [
+        CatalogEntity(
+            entity_id=entity.entity_id,
+            name=entity.name,
+            domain=entity.domain,
+            aliases=entity.aliases,
+            area_id=entity.area_id,
+            area_name=entity.area_name,
+            area_aliases=entity.area_aliases,
+            state="on" if entity.entity_id == window else "off",
+        )
+        for entity in cat.entities
+    ]
+    result = filter_catalog("Släck i barnrummet", cat)
+    assert [entity.entity_id for entity in result.entities] == [window]
+    block = render_from_filter(result)
+    assert "turn off the lights that are on in Barnrummet" in block
+    assert "Do not ask which action to take" in block
+
+
 def test_fonsterlampa_i_barnrummet_stays_the_window() -> None:
     result = filter_catalog("Släck fönsterlampan i barnrummet", _house_catalog())
     assert result.entities[0].entity_id == "light.fonster_belysning_barnrum_sovrum_barn"
