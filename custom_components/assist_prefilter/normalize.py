@@ -239,3 +239,103 @@ def fold_match(a: str, b: str) -> bool:
     a_exp = expand_tokens(tokenize(a))
     b_exp = expand_tokens(tokenize(b))
     return bool(a_exp & b_exp)
+
+
+# STT often hears the imperative "släck" as the adjective "släckt".
+_SLACKT_WORD = re.compile(r"släckt", re.IGNORECASE)
+_WORD = re.compile(r"\w+", re.UNICODE)
+# Words that mean the following "släckt" is a state ("är släckt"), not a command.
+_STATE_BEFORE_SLACKT = frozenset(
+    {
+        "är",
+        "ar",
+        "e",
+        "var",
+        "blir",
+        "blev",
+        "varit",
+        "förblir",
+        "forblir",
+        "verkar",
+        "känns",
+        "kanns",
+    }
+)
+# Words that mean the following "släckt" is still the verb ("kan du släckt …").
+_COMMAND_BEFORE_SLACKT = frozenset(
+    {
+        "snälla",
+        "snalla",
+        "du",
+        "kan",
+        "kunde",
+        "vill",
+        "ska",
+        "och",
+        "sen",
+        "sedan",
+        "bara",
+        "nu",
+        "please",
+    }
+)
+
+
+def _previous_word(text: str, index: int) -> str:
+    words = _WORD.findall(text[:index])
+    return words[-1].casefold() if words else ""
+
+
+def _is_question(text: str) -> bool:
+    stripped = text.strip()
+    if "?" in stripped:
+        return True
+    first = _WORD.match(stripped)
+    if first is None:
+        return False
+    return first.group(0).casefold() in {
+        "är",
+        "ar",
+        "hur",
+        "vad",
+        "vilken",
+        "vilket",
+        "vilka",
+        "vem",
+        "varför",
+        "varfor",
+        "när",
+        "nar",
+        "finns",
+    }
+
+
+def _command_spelling(word: str) -> str:
+    if word.isupper():
+        return "SLÄCK"
+    if word[0].isupper():
+        return "Släck"
+    return "släck"
+
+
+def repair_stt_command(text: str) -> str:
+    """Turn command-position "släckt" into "släck". Leave state questions alone.
+
+    "släckt taklampan i köket" is the imperative the recognizer mis-heard.
+    "är lampan släckt?" and "lampan är släckt" are real state wording.
+    """
+    if not _SLACKT_WORD.search(text):
+        return text
+    question = _is_question(text)
+
+    def repl(match: re.Match[str]) -> str:
+        prev = _previous_word(text, match.start())
+        if prev in _STATE_BEFORE_SLACKT:
+            return match.group(0)
+        if prev in _COMMAND_BEFORE_SLACKT or not prev:
+            return _command_spelling(match.group(0))
+        if question:
+            return match.group(0)
+        return _command_spelling(match.group(0))
+
+    return _SLACKT_WORD.sub(repl, text)

@@ -1,6 +1,12 @@
 """Fold / definite-form tests. No Home Assistant required."""
 
-from assist_prefilter.normalize import expand_token, fold, fold_match, folded_tokens
+from assist_prefilter.normalize import (
+    expand_token,
+    fold,
+    fold_match,
+    folded_tokens,
+    repair_stt_command,
+)
 
 
 def test_fold_swedish_variants_match_slug() -> None:
@@ -45,6 +51,22 @@ def test_folded_tokens_splits_sentence() -> None:
     assert "taklampan" in tokens
     assert "koket" in tokens
     assert "slack" in tokens
+
+
+def test_command_slackt_becomes_slack() -> None:
+    assert repair_stt_command("släckt taklampan i köket") == "släck taklampan i köket"
+    assert repair_stt_command("Släckt lampan") == "Släck lampan"
+    assert repair_stt_command("snälla släckt bänklampan") == "snälla släck bänklampan"
+    assert repair_stt_command("kan du släckt lampan?") == "kan du släck lampan?"
+
+
+def test_state_question_keeps_slackt() -> None:
+    assert repair_stt_command("är lampan släckt?") == "är lampan släckt?"
+    assert repair_stt_command("är taklampan släckt i köket?") == (
+        "är taklampan släckt i köket?"
+    )
+    assert repair_stt_command("lampan är släckt") == "lampan är släckt"
+    assert repair_stt_command("taklampan släckt?") == "taklampan släckt?"
 
 
 def test_entity_id_style_underscores() -> None:

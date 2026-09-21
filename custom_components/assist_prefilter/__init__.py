@@ -68,7 +68,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
     from .catalog import CatalogCache, render_from_filter, satellite_area_id
     from .filter import filter_catalog, utterance_is_query
-    from .normalize import expand_tokens, fold, folded_tokens
+    from .normalize import expand_tokens, fold, folded_tokens, repair_stt_command
 
     hass.data.setdefault(DOMAIN, {})
     from .llm_api import async_register_filtered_api
@@ -78,7 +78,8 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         return True
 
     async def _debug_filter(call: ServiceCall) -> dict[str, Any]:
-        text: str = call.data["text"]
+        heard: str = call.data["text"]
+        text = repair_stt_command(heard)
         agent_entity_id: str | None = call.data.get("agent_entity_id")
         entry: ConfigEntry | None = None
         if agent_entity_id:
@@ -91,7 +92,11 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
             entries = hass.config_entries.async_entries(DOMAIN)
             entry = entries[0] if entries else None
         if entry is None:
-            return {"error": "no_config_entry", "folded_text": fold(text)}
+            return {
+                "error": "no_config_entry",
+                "text": text,
+                "folded_text": fold(text),
+            }
 
         conf = entry_config(entry)
         stored = hass.data[DOMAIN].setdefault(entry.entry_id, {})
@@ -128,6 +133,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
             fallback=fallback,
         )
         return {
+            "text": text,
             "folded_text": result.folded_text,
             "tokens": result.tokens,
             "expanded_tokens": sorted(result.expanded_tokens),

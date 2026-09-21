@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 import logging
 import time
 from typing import Any, Literal
@@ -36,7 +37,7 @@ from .const import (
 )
 from .filter import FilterResult, filter_catalog, utterance_is_query
 from .filter_store import clear_pending, store_pending
-from .normalize import expand_tokens, folded_tokens
+from .normalize import expand_tokens, folded_tokens, repair_stt_command
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -208,6 +209,11 @@ class AssistPrefilterEntity(
             return self._error_result(user_input, chat_log, "not_configured")
         if downstream == self.entity_id:
             return self._error_result(user_input, chat_log, "recursion")
+
+        repaired = repair_stt_command(user_input.text)
+        if repaired != user_input.text:
+            _LOGGER.debug("Repaired command wording before the LLM")
+            user_input = replace(user_input, text=repaired)
 
         if conf.get(CONF_PREFER_LOCAL_INTENTS, True):
             local = await self._try_local_intents(user_input, chat_log)
