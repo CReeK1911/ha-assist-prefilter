@@ -248,6 +248,10 @@ ERROR_SPEECH: Final[dict[str, dict[str, str]]] = {
         ),
         "missing_agent": "The downstream conversation agent is unavailable.",
         "recursion": "Assist Prefilter cannot use itself as the downstream agent.",
+        "turn_off": "Turning off the lights in {room}.",
+        "turn_on": "Turning on the lights in {room}.",
+        "turn_off_named": "Turning off {name}.",
+        "turn_on_named": "Turning on {name}.",
     },
     "sv": {
         "not_configured": (
@@ -256,8 +260,24 @@ ERROR_SPEECH: Final[dict[str, dict[str, str]]] = {
         ),
         "missing_agent": "Nedströms konversationsagent saknas eller är otillgänglig.",
         "recursion": "Assist Prefilter kan inte använda sig själv som nedströms agent.",
+        "turn_off": "Släcker i {room}.",
+        "turn_on": "Tänder i {room}.",
+        "turn_off_named": "Släcker {name}.",
+        "turn_on_named": "Tänder {name}.",
     },
 }
+
+
+def action_speech(
+    language: str | None, action: str, *, room: str | None, name: str | None
+) -> str:
+    """Short confirmation after the prefilter runs a light command itself."""
+    lang = "sv" if (language or "").lower().startswith("sv") else "en"
+    table = ERROR_SPEECH[lang]
+    if name:
+        return table[f"{action}_named"].format(name=name)
+    place = room or ("rummet" if lang == "sv" else "the room")
+    return table[action].format(room=place)
 
 
 def error_speech(language: str | None, key: str) -> str:

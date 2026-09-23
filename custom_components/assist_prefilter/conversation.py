@@ -17,6 +17,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from . import entry_config
 from .catalog import CatalogCache, render_from_filter, satellite_area_id
 from .const import (
+    action_speech,
     CONF_DOWNSTREAM_AGENT_ID,
     CONF_EXCLUDE_DOMAINS,
     CONF_FALLBACK_TO_FULL_CATALOG,
@@ -170,6 +171,75 @@ class AssistPrefilterEntity(
     def _fire_event(self, payload: dict[str, Any]) -> None:
         self.hass.bus.async_fire(EVENT_FILTERED, payload)
 
+    async def _try_needle_execute(
+        self,
+        user_input: conversation.ConversationInput,
+        chat_log: conversation.ChatLog,
+        result: FilterResult,
+        url: str,
+    ) -> conversation.ConversationResult | None:
+        """Run a light command when Needle's answer stays inside the filtered set."""
+        from .needle_client import needle_execute
+
+        started = time.perf_counter()
+        entity_ids = await needle_execute(
+            self.hass, url, user_input.text, result
+        )
+        if not entity_ids:
+            return None
+        service = "turn_on" if result.action == "turn_on" else "turn_off"
+        try:
+            await self.hass.services.async_call(
+                "light",
+                service,
+                {"entity_id": entity_ids},
+                blocking=True,
+                context=user_input.context,
+            )
+        except Exception as err:
+            _LOGGER.debug("Could not run Needle light command: %s", err)
+            return None
+
+        chosen = [entity for entity in result.entities if entity.entity_id in set(entity_ids)]
+        if len(chosen) == 1:
+            raw_name = chosen[0].name or entity_ids[0]
+            speech = action_speech(
+                user_input.language,
+                service,
+                room=None,
+                name=raw_name.split(" - ", 1)[0],
+            )
+        else:
+            room = next((entity.area_name for entity in chosen if entity.area_name), None)
+            speech = action_speech(
+                user_input.language, service, room=room, name=None
+            )
+        chat_log.async_add_assistant_content_without_tools(
+            conversation.AssistantContent(
+                agent_id=user_input.agent_id or self.entity_id,
+                content=speech,
+            )
+        )
+        response = intent.IntentResponse(language=user_input.language or "")
+        response.async_set_speech(speech)
+        self._fire_event(
+            {
+                "local_intent": False,
+                "needle_executed": True,
+                "entity_count": len(entity_ids),
+                "area_count": len(result.areas),
+                "entity_ids": entity_ids,
+                "area_ids": [area.area_id for area in result.areas],
+                "elapsed_ms": int((time.perf_counter() - started) * 1000),
+                "agent_entity_id": self.entity_id,
+                "is_query": False,
+            }
+        )
+        return conversation.ConversationResult(
+            response=response,
+            conversation_id=chat_log.conversation_id,
+        )
+
     async def _try_local_intents(
         self,
         user_input: conversation.ConversationInput,
@@ -256,12 +326,19 @@ class AssistPrefilterEntity(
         if conf.get(CONF_NEEDLE_ENABLED) and conf.get(CONF_NEEDLE_URL):
             from .needle_client import needle_refine
 
-            result = await needle_refine(
-                self.hass,
-                str(conf[CONF_NEEDLE_URL]),
-                user_input.text,
-                result,
-            )
+            if result.action in {"turn_on", "turn_off"}:
+                executed = await self._try_needle_execute(
+                    user_input, chat_log, result, str(conf[CONF_NEEDLE_URL])
+                )
+                if executed is not None:
+                    return executed
+            else:
+                result = await needle_refine(
+                    self.hass,
+                    str(conf[CONF_NEEDLE_URL]),
+                    user_input.text,
+                    result,
+                )
 
         fallback = (
             catalog

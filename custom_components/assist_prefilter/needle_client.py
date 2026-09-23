@@ -24,6 +24,7 @@ def _candidate_payload(result: FilterResult) -> dict[str, Any]:
                 "aliases": list(ent.aliases),
                 "area": ent.area_name,
                 "domain": ent.domain,
+                "state": ent.state,
             }
             for ent in result.entities
         ],
@@ -64,6 +65,83 @@ def _apply_selection(
         is_query=result.is_query,
         action=result.action,
     )
+
+
+def accepted_light_command(
+    action: str | None,
+    allowed_entity_ids: set[str],
+    payload: Any,
+) -> list[str] | None:
+    """Return entity ids to act on, or None when the answer must not be executed.
+
+    The service has to match the spoken action, and every returned id has to be
+    one of the lights the prefilter already selected.
+    """
+    if action not in {"turn_on", "turn_off"} or not isinstance(payload, dict):
+        return None
+    if not allowed_entity_ids:
+        return None
+    service = payload.get("service")
+    found = [str(item) for item in payload.get("entity_ids") or [] if item]
+    if service != action or not found:
+        return None
+    if any(entity_id not in allowed_entity_ids for entity_id in found):
+        return None
+    unique: list[str] = []
+    for entity_id in found:
+        if entity_id not in unique:
+            unique.append(entity_id)
+    return unique
+
+
+async def needle_execute(
+    hass: Any,
+    url: str,
+    text: str,
+    result: FilterResult,
+    *,
+    timeout_ms: int = DEFAULT_NEEDLE_TIMEOUT_MS,
+) -> list[str] | None:
+    """Ask Needle to turn the selected lights on or off.
+
+    None means do not execute. The caller then uses the language model.
+    """
+    if result.action not in {"turn_on", "turn_off"} or not url:
+        return None
+    allowed = {
+        entity.entity_id
+        for entity in result.entities
+        if entity.domain == "light"
+    }
+    if not allowed:
+        return None
+
+    from homeassistant.helpers.aiohttp_client import async_get_clientsession
+
+    payload = {
+        "utterance": text,
+        "action": result.action,
+        "candidates": _candidate_payload(result),
+    }
+    timeout_s = max(timeout_ms, 50) / 1000.0
+    session = async_get_clientsession(hass)
+    try:
+        from aiohttp import ClientTimeout
+
+        async with session.post(
+            url, json=payload, timeout=ClientTimeout(total=timeout_s)
+        ) as resp:
+            if resp.status >= 400:
+                _LOGGER.debug("Needle HTTP %s — leaving the command to the LLM", resp.status)
+                return None
+            data = await resp.json(content_type=None)
+    except Exception as err:
+        _LOGGER.debug("Needle unavailable (%s) — leaving the command to the LLM", err)
+        return None
+    accepted = accepted_light_command(result.action, allowed, data)
+    if not accepted:
+        _LOGGER.debug("Needle answer was not executable")
+    return accepted
 
 
 async def needle_refine(
